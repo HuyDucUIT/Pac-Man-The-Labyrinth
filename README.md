@@ -33,7 +33,7 @@ Trùm (Stalker Boss) có tốc độ di chuyển mặc định là **3.5 px/fram
 * **Màn 2:** Nghe.
 * **Màn 3:** Nghe + Nhìn.
 * **Màn 4:** Nghe + Nhìn + Ngửi + Xuất hiện 2 Boss cùng lúc
-* **Màn 4:** Nghe + Nhìn + Ngửi + Xuất hiện 2 Boss cùng lúc + Chết
+* **Màn 5:** Nghe + Nhìn + Ngửi + Xuất hiện 2 Boss cùng lúc + Chết
 
 ### Thông số Giác quan (Sensory Stats)
 | Giác quan | Bán kính kích hoạt | Cơ chế hoạt động (State Machine) |
@@ -42,7 +42,7 @@ Trùm (Stalker Boss) có tốc độ di chuyển mặc định là **3.5 px/fram
 | 👁️ **Nhìn (See)** | **8 Tiles** | Chỉ kích hoạt nếu Pac-man đứng ngoài sáng (`is_hidden = False`) và không bị tường che (Line of Sight). Boss sẽ khóa thẳng mục tiêu (`CHASE`). |
 | 👃 **Ngửi (Smell)**| **3.5 Tiles** | Dù Pac-man có trốn trong bóng tối tuyệt đối, nếu Boss đi tuần ngang qua sát vách (3.5 ô), nó sẽ đánh hơi thấy, đi chậm lại và lùng sục quanh khu vực đó. |
 
-### Màn cuối:
+### Màn cuối đặc biệt (màn 5):
 * Lụm 4 vật đặc biệt bỏ vào phòng trung tâm, sau khi lụm từng vật đặc biệt, boss sẽ được buff:
 * Vật 1: Boss sẽ Nghe được
 * Vật 2: Boss sẽ Nhìn được
