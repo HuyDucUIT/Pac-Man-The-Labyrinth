@@ -102,39 +102,3 @@ PACMAN-SURVIVAL/
     ├── hud.py               # HUD, Prompt chỉ dẫn ("Nhấn E để gạt")
     └── shop_maze.py         # Giao diện nâng cấp Shop
 ```
----
-5. PHÂN CÔNG NHIỆM VỤ (TASK ASSIGNMENT)
-   
-👴 Thành viên 1: Kiến trúc cốt lõi & Quản lý Map
-Nắm giữ thư mục core/ và systems/sound.py.
-
-Nhiệm vụ:
-
-Cập nhật FSM trong game.py để hỗ trợ chế độ Maze và luồng "Start Over" (Reset player_state).
-Viết lại cấu trúc lưu trữ bản đồ trong map.py (Tách riêng mảng ma trận Tường/Sàn và list Object).
-Code room_manager.py để chuyển đổi mượt mà giữa các phòng, reset thực thể.
-
-🥷 Thành viên 2: Trí tuệ nhân tạo (AI & Pathfinding)
-Nắm giữ thư mục entities/.
-
-Nhiệm vụ:
-Viết lại hàm check va chạm (Collision) trong entity.py cho tương thích với map mới.
-Cập nhật thuộc tính is_hidden và công thức cộng dồn tốc độ cho pacman.py.
-Code thuật toán AI 3 trạng thái (WANDER, INVESTIGATE, CHASE) cho Boss trong stalker_ghost.py với khả năng di chuyển Vector xuyên tường tới tọa độ tiếng ồn.
-
-🕯️ Thành viên 3: Đồ họa, Ánh sáng & Giao diện (Graphics & UI)
-Nắm giữ thư mục ui/.
-
-Nhiệm vụ:
-Code lighting.py: Xử lý mảng tối che khuất tầm nhìn, tạo quầng sáng gradient và dùng thuật toán Blend đục lỗ sáng dựa trên vị trí Nến và Pac-man.
-Vẽ Ambient Glow cho các hạt tiền và vật thể tương tác.
-Xây dựng giao diện cho shop_maze.py và các đoạn chữ hiển thị thông báo (hud.py).
-
-🗝️ Thành viên 4: Gameplay Loop, Vật phẩm & Logic
-Nắm giữ thư mục interactables/ và systems/.
-
-Nhiệm vụ:
-Xây dựng tính đa hình cho các vật thể tương tác (Candle, Dot, Switch, Note, Door).
-Code sự kiện va chạm: Ăn hạt cộng tiền (gọi hàm đánh động Boss nếu chưa mua giảm ồn).
-Code objectives.py theo dõi điều kiện qua màn.
-Khi đè lên Cửa, gửi tín hiệu bật bảng lựa chọn: Nhấn ENTER (sang màn) hoặc ESC (ở lại farm).
