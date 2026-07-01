@@ -263,19 +263,49 @@ class Dot(Interactable):
 class Lever(Interactable):
     def __init__(self, x, y):
         super().__init__(x, y, TILE, TILE, DARK_GRAY)
+        self.pulled = False
 
     def draw(self, surface, camera):
-        if not self.active: return
         r = camera.apply(self)
-        pygame.draw.rect(surface, (60,55,50), r)
-        pygame.draw.rect(surface, (80,72,62), r, 1)
-        pygame.draw.line(surface, (160,40,40), (r.centerx, r.y+6), (r.centerx, r.y+22), 3)
-        pygame.draw.circle(surface, RED, (r.centerx, r.y+6), 5)
-        pygame.draw.circle(surface, (220,80,80), (r.centerx, r.y+6), 3)
+        # Đế
+        base_rect = pygame.Rect(r.x+3, r.y+r.height-10, r.width-6, 10)
+        pygame.draw.rect(surface, (45,40,35), base_rect, border_radius=3)
+        pygame.draw.rect(surface, (80,72,62), base_rect, 1, border_radius=3)
+        pygame.draw.line(surface, (100,90,78),
+                         (base_rect.x+2, base_rect.y+1),
+                         (base_rect.right-2, base_rect.y+1), 1)
+        # Rãnh trượt
+        slot_x = r.centerx - 2
+        pivot_y = r.y + r.height - 10
+        pygame.draw.rect(surface, (20,18,15), (slot_x, pivot_y-4, 4, 10), border_radius=2)
+        # Thân cần gạt
+        arm_len   = r.height - 14
+        angle_deg = -135 if self.pulled else -45
+        angle_rad = math.radians(angle_deg)
+        tip_x = r.centerx + int(math.cos(angle_rad) * arm_len)
+        tip_y = pivot_y    + int(math.sin(angle_rad) * arm_len)
+        arm_color = (0,160,60)  if self.pulled else (180,40,40)
+        arm_dark  = (0,90,35)   if self.pulled else (100,20,20)
+        pygame.draw.line(surface, arm_dark,  (r.centerx, pivot_y), (tip_x, tip_y), 6)
+        pygame.draw.line(surface, arm_color, (r.centerx, pivot_y), (tip_x, tip_y), 4)
+        # Núm
+        knob_color = (0,220,80)   if self.pulled else (220,60,60)
+        knob_shine = (80,255,140) if self.pulled else (255,130,130)
+        pygame.draw.circle(surface, arm_dark,   (tip_x, tip_y), 7)
+        pygame.draw.circle(surface, knob_color, (tip_x, tip_y), 6)
+        pygame.draw.circle(surface, knob_shine, (tip_x-2, tip_y-2), 2)
+        # Vít xoay
+        pygame.draw.circle(surface, (55,50,45), (r.centerx, pivot_y), 4)
+        pygame.draw.circle(surface, (90,82,70), (r.centerx, pivot_y), 3)
+        # Label
+        font_tiny = pygame.font.SysFont("Courier New", 8, bold=True)
+        lbl_col   = (0,200,70) if self.pulled else (180,50,50)
+        lbl = font_tiny.render("ON" if self.pulled else "OFF", True, lbl_col)
+        surface.blit(lbl, (r.centerx - lbl.get_width()//2, r.y+2))
 
     def interact(self, player, gs):
-        if self.active:
-            self.active = False
+        if not self.pulled:
+            self.pulled = True
             gs.levers_pulled += 1
             if gs.sfx_lever: gs.sfx_lever.play()
             gs.make_noise(self.rect.centerx, self.rect.centery, radius=0, is_loud=True)
@@ -920,6 +950,7 @@ class GameEngine:
         self.sfx_button = load_sound("assets/breaker alarm.wav")
         self.sfx_grab   = load_sound("assets/grab.wav")
         self.sfx_bell   = load_sound("assets/subtleBell.wav") # Thêm âm thanh bell
+        self.sfx_dead   = load_sound("assets/dead monster.wav") # Thêm âm thanh dead monster
         
         self.snd_ambience = load_sound("assets/ambience.wav")
         self.snd_chase    = load_sound("assets/chase.wav")
@@ -960,6 +991,9 @@ class GameEngine:
         self.buff_popup_text  = []
         self.buff_popup_timer = 0
 
+        self.jumpscare_timer = 0
+        self.jumpscare_phase = "flash"
+
     def _update_volume(self):
         ov = self.global_volume * 0.8
         if self.sfx_step:   self.sfx_step.set_volume(ov * 0.3)
@@ -967,6 +1001,7 @@ class GameEngine:
         if self.sfx_button: self.sfx_button.set_volume(ov * 0.48 * 0.5)
         if self.sfx_grab:   self.sfx_grab.set_volume(ov * 0.64)
         if self.sfx_bell:   self.sfx_bell.set_volume(ov * 0.77)
+        if self.sfx_dead:   self.sfx_dead.set_volume(ov * 1.0) # Thêm volume cho dead monster
 
     def build_visual_surface(self, w, h, walls_list):
         surf = pygame.Surface((w, h))
@@ -1293,17 +1328,17 @@ class GameEngine:
                                 self.player_stats.coins = coins_map[lvl]
                                 self.shop_target_level = lvl
                                 self.state = "SHOP"
-                # Classic mode không có tính năng được định nghĩa trong prompt gốc nên không xử lý logic ở đây
 
             if event.type == pygame.KEYDOWN:
                 if self.state == "LEVEL_INTRO" and event.key == pygame.K_SPACE:
                     self.state = "PLAYING"
 
                 elif self.state == "JUMPSCARE":
-                    if event.key == pygame.K_SPACE:
-                        self.reset_game(next_level=False, keep_stats=True)
-                    elif event.key == pygame.K_ESCAPE:
-                        self.state = "MENU"
+                    if self.jumpscare_phase == "dead" and self.jumpscare_timer > 75:
+                        if event.key == pygame.K_SPACE:
+                            self.reset_game(next_level=False, keep_stats=True)
+                        elif event.key == pygame.K_ESCAPE:
+                            self.state = "MENU"
 
                 elif self.state == "VICTORY_SCREEN":
                     if event.key in (pygame.K_ESCAPE, pygame.K_SPACE):
@@ -1452,6 +1487,8 @@ class GameEngine:
                     if self.hand_grab_boss is not None:
                         self.hand_grab_boss.grabbing = False
                         self.hand_grab_boss = None
+                    self.jumpscare_timer = 0
+                    self.jumpscare_phase = "flash"
                     self.state = "JUMPSCARE"
                 return
 
@@ -1485,7 +1522,7 @@ class GameEngine:
                     if isinstance(item,ButtonInteract) and item.active:
                         item.hold_progress = 0
 
-            self.interactables = [i for i in self.interactables if i.active]
+            self.interactables = [i for i in self.interactables if i.active or isinstance(i, Lever)]
 
             for boss in self.bosses:
                 if self.current_level==5:
@@ -1494,6 +1531,8 @@ class GameEngine:
                 boss.update(self.player, self.walls, self.map_w, self.map_h, self)
 
                 if self.player.rect.colliderect(boss.rect):
+                    self.jumpscare_timer = 0
+                    self.jumpscare_phase = "flash"
                     self.state = "JUMPSCARE"
 
                 if self.hand_grab_timer <= 0 and self.state == "PLAYING":
@@ -1940,11 +1979,127 @@ class GameEngine:
                 self.draw_shop_ui()
 
             elif self.state == "JUMPSCARE":
-                self.screen.fill(RED)
-                js = self.title_font.render("YOU GOT CAUGHT!", True, BLACK)
-                pr = self.font.render("SPACE: Respawn  |  ESC: Menu", True, BLACK)
-                self.screen.blit(js,(SCREEN_WIDTH//2-js.get_width()//2, SCREEN_HEIGHT//2-50))
-                self.screen.blit(pr,(SCREEN_WIDTH//2-pr.get_width()//2, SCREEN_HEIGHT//2+20))
+                # Phát âm thanh 1 lần khi bắt đầu jumpscare
+                if self.jumpscare_timer == 0 and getattr(self, 'sfx_dead', None):
+                    self.sfx_dead.play()
+                    
+                self.jumpscare_timer += 1
+                t = self.jumpscare_timer
+
+                # Phase 1: flash trắng chói (0-5 frame)
+                if t <= 5:
+                    self.jumpscare_phase = "flash"
+                    self.screen.fill((int(255*(1-t/5)),)*3)
+
+                # Phase 2: mặt ma lao thẳng vào (6-50 frame)
+                elif t <= 50:
+                    self.jumpscare_phase = "face"
+                    self.screen.fill((0,0,0))
+                    progress = (t-6)/44.0
+                    ease     = 1.0-(1.0-progress)**2.5
+                    size     = max(10, int(SCREEN_HEIGHT*0.12 + ease*SCREEN_HEIGHT*1.5))
+                    shake_x  = random.randint(-12,12) if t>15 else 0
+                    shake_y  = random.randint(-10,10) if t>15 else 0
+
+                    # nhiễu tĩnh
+                    if t < 35:
+                        for _ in range(int(600*(1-progress*0.6))):
+                            nx2 = random.randint(0,SCREEN_WIDTH-1)
+                            ny2 = random.randint(0,SCREEN_HEIGHT-1)
+                            nv  = random.randint(60,200)
+                            self.screen.set_at((nx2,ny2),(nv,nv,nv))
+
+                    # vẽ mặt
+                    cs   = size
+                    face = pygame.Surface((cs,cs), pygame.SRCALPHA)
+                    fc   = cs//2
+                    br2  = cs//2-2
+                    rng2 = random.Random(42)
+
+                    # thân oval méo
+                    n_body = 40
+                    body_pts = []
+                    for i in range(n_body):
+                        a   = -math.pi/2+i*(2*math.pi/n_body)
+                        jit = 1.0+math.sin(a*3.7+t*0.3)*0.06
+                        body_pts.append((
+                            int(fc+math.cos(a)*br2*jit),
+                            int(fc+math.sin(a)*br2*1.15*jit)))
+                    pygame.draw.polygon(face,(140,8,8,240),body_pts)
+                    pygame.draw.polygon(face,(80,0,0,255),body_pts,3)
+
+                    # mắt bất đối xứng + tia máu
+                    eye_r = max(3,br2//5)
+                    for sgn,ey_off in [(-1,-br2//10),(1,br2//8)]:
+                        ecx = fc+sgn*br2//3
+                        ecy = fc-br2//8+ey_off
+                        pygame.draw.ellipse(face,(0,0,0,255),
+                            (ecx-eye_r, ecy-int(eye_r*1.4), eye_r*2, int(eye_r*2.8)))
+                        for va_deg in range(0,360,45):
+                            va  = math.radians(va_deg)
+                            pygame.draw.line(face,(180,0,0,160),
+                                (ecx+int(math.cos(va)*eye_r),   ecy+int(math.sin(va)*eye_r*1.4)),
+                                (ecx+int(math.cos(va)*eye_r*1.9),ecy+int(math.sin(va)*eye_r*1.4*1.9)),1)
+                        pygame.draw.circle(face,(230,220,210,200),(ecx,ecy),max(1,eye_r//3))
+
+                    # miệng + răng
+                    mw = int(br2*1.5); mh = int(br2*0.65); mcy = fc+br2//3
+                    mr = pygame.Rect(fc-mw//2, mcy-mh//2, mw, mh)
+                    pygame.draw.ellipse(face,(5,0,0,255),mr)
+                    pygame.draw.ellipse(face,(60,0,0,255),mr,2)
+                    n_t2 = 7; tw5 = mw//n_t2
+                    th_list = [int(mh*(0.4+rng2.uniform(0,0.45))) for _ in range(n_t2)]
+                    for i in range(n_t2):
+                        tx3 = fc-mw//2+i*tw5+2; th2 = th_list[i]
+                        pygame.draw.polygon(face,(235,225,210,255),
+                            [(tx3,mcy-mh//2+2),(tx3+tw5-4,mcy-mh//2+2),(tx3+(tw5-4)//2,mcy-mh//2+2+th2)])
+                    for i in range(n_t2-1):
+                        tx3 = fc-mw//2+i*tw5+tw5//2+2
+                        th2 = int(mh*rng2.uniform(0.2,0.38))
+                        pygame.draw.polygon(face,(215,205,190,255),
+                            [(tx3,mcy+mh//2-2),(tx3+tw5-6,mcy+mh//2-2),(tx3+(tw5-6)//2,mcy+mh//2-2-th2)])
+
+                    # vết nứt
+                    rng3 = random.Random(99)
+                    for _ in range(5):
+                        cx3 = fc+rng3.randint(-br2//2,br2//2)
+                        cy3 = fc+rng3.randint(-br2//2,br2//2)
+                        cl  = rng3.randint(br2//6,br2//3)
+                        ca  = rng3.uniform(0,math.pi)
+                        pygame.draw.line(face,(60,0,0,200),(cx3,cy3),
+                            (cx3+int(math.cos(ca)*cl),cy3+int(math.sin(ca)*cl)),2)
+
+                    self.screen.blit(face,(SCREEN_WIDTH//2-cs//2+shake_x,
+                                          SCREEN_HEIGHT//2-cs//2+shake_y))
+
+                    # overlay đỏ đập nhịp
+                    ov = pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT),pygame.SRCALPHA)
+                    ov.fill((160,0,0,int(40+abs(math.sin(t*0.5))*80)))
+                    self.screen.blit(ov,(0,0))
+
+                    # scan lines
+                    if t < 30:
+                        for sy2 in range(0,SCREEN_HEIGHT,4):
+                            pygame.draw.line(self.screen,(0,0,0),(0,sy2),(SCREEN_WIDTH,sy2),1)
+
+                # Phase 3: đỏ máu + text (51+)
+                else:
+                    self.jumpscare_phase = "dead"
+                    fade_t = min(1.0,(t-51)/15.0)
+                    self.screen.fill((int(60+100*fade_t),0,0))
+                    if t < 70:
+                        for _ in range(100):
+                            self.screen.set_at(
+                                (random.randint(0,SCREEN_WIDTH-1),
+                                 random.randint(0,SCREEN_HEIGHT-1)),
+                                (random.randint(80,160),0,0))
+                    if t > 62:
+                        a2 = min(255,int((t-62)*14))
+                        js_s = self.title_font.render("YOU GOT CAUGHT!",True,(0,0,0))
+                        pr_s = self.font.render("SPACE: Respawn  |  ESC: Menu",True,(0,0,0))
+                        js_s.set_alpha(a2); pr_s.set_alpha(a2)
+                        self.screen.blit(js_s,(SCREEN_WIDTH//2-js_s.get_width()//2,SCREEN_HEIGHT//2-50))
+                        self.screen.blit(pr_s,(SCREEN_WIDTH//2-pr_s.get_width()//2,SCREEN_HEIGHT//2+20))
 
             elif self.state == "VICTORY_SCREEN":
                 self.screen.fill((20,40,20))
