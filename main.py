@@ -2,7 +2,6 @@ import pygame
 import math
 import random
 import sys
-import os
 from abc import ABC, abstractmethod
 
 # ================= CẤU HÌNH & HẰNG SỐ =================
@@ -381,7 +380,7 @@ class UnpickableCandle(GameObject):
         pygame.draw.ellipse(surface, (255,200,50), (fx-3, fy-6, 6, 8))
         pygame.draw.ellipse(surface, (255,240,120),(fx-2, fy-4, 4, 5))
 
-class SpecialItem(Interactable):
+class Artifact(Interactable):
     def __init__(self, x, y):
         super().__init__(x+4, y+4, 24, 24, MAGENTA)
         self._bob = random.uniform(0, math.pi*2)
@@ -519,7 +518,7 @@ class Player(Entity):
             pygame.draw.circle(surface, tuple(min(255,c+60) for c in col), center, radius, 1)
 
 # ================= STALKER BOSS =================
-class StalkerBoss(Entity):
+class Ghost(Entity):
     def __init__(self, x, y, level):
         super().__init__(x, y, TILE, TILE, BOSS_RED, 3.5)
         self.level = level
@@ -572,8 +571,8 @@ class StalkerBoss(Entity):
 
         if self.state == "ROAM":
             if not self.target_pos or random.random() < 0.02:
-                nx = max(TILE*3, min(map_w-TILE*4, self.rect.centerx+random.randint(-400,400)))
-                ny = max(TILE*3, min(map_h-TILE*4, self.rect.centery+random.randint(-400,400)))
+                nx = random.randint(TILE * 3, map_w - TILE * 4)
+                ny = random.randint(TILE * 3, map_h - TILE * 4)
                 self.target_pos = (nx, ny)
 
         elif self.state == "INVESTIGATE":
@@ -772,7 +771,7 @@ class StalkerBoss(Entity):
         for sgn in (-1, 1):
             ecx = body_cx + sgn * eye_dx
             pygame.draw.ellipse(canvas, (12,3,3,255),
-                (ecx-eye_r, eye_y3-int(eye_r*1.1), eye_r*2, int(eye_r*2.2)))
+                (ecx-eye_r, eye_y3-int(eye_r*1.1), eye_r*2, int(eye_r*2.8)))
             pygame.draw.circle(canvas, (210,195,195,160),
                 (ecx-int(eye_r*0.22), eye_y3-int(eye_r*0.30)),
                 max(1,int(eye_r*0.26)))
@@ -970,19 +969,21 @@ class GameEngine:
         self.hand_grab_boss  = None
 
         self.show_level_choices = False
-        self.btn_labyrinth = pygame.Rect(SCREEN_WIDTH//2-150, 300, 300, 50)
-        self.btn_choose    = pygame.Rect(SCREEN_WIDTH//2-150, 370, 300, 50)
-        self.btn_lvls      = [
-            pygame.Rect(SCREEN_WIDTH//2-190, 440, 60, 50),
-            pygame.Rect(SCREEN_WIDTH//2-120, 440, 60, 50),
-            pygame.Rect(SCREEN_WIDTH//2-50,  440, 60, 50),
-            pygame.Rect(SCREEN_WIDTH//2+20,  440, 60, 50),
-            pygame.Rect(SCREEN_WIDTH//2+90,  440, 100, 50),
-        ]
-        self.btn_classic   = pygame.Rect(SCREEN_WIDTH//2-150, 440, 300, 50)
         
-        self.btn_continue  = pygame.Rect(SCREEN_WIDTH//2-150, 400, 300, 50)
-        self.btn_exit_pause= pygame.Rect(SCREEN_WIDTH//2-150, 470, 300, 50)
+        # --- Main Menu Buttons ---
+        self.btn_labyrinth = pygame.Rect(SCREEN_WIDTH//2-150, 350, 300, 50)
+        self.btn_choose    = pygame.Rect(SCREEN_WIDTH//2-150, 420, 300, 50)
+        self.btn_lvls      = [
+            pygame.Rect(SCREEN_WIDTH//2-190, 490, 60, 50),
+            pygame.Rect(SCREEN_WIDTH//2-120, 490, 60, 50),
+            pygame.Rect(SCREEN_WIDTH//2-50,  490, 60, 50),
+            pygame.Rect(SCREEN_WIDTH//2+20,  490, 60, 50),
+            pygame.Rect(SCREEN_WIDTH//2+90,  490, 100, 50),
+        ]
+        
+        # --- Pause Menu Buttons ---
+        self.btn_continue  = pygame.Rect(SCREEN_WIDTH//2-150, 360, 300, 50)
+        self.btn_exit_pause= pygame.Rect(SCREEN_WIDTH//2-150, 430, 300, 50)
         
         self.vol_rect      = pygame.Rect(SCREEN_WIDTH//2-150, 520, 300, 20)
         self.global_volume = 1.0
@@ -1190,7 +1191,7 @@ class GameEngine:
             bx = TILE * 6
             by = TILE * 6 if i == 0 else self.map_h - TILE * 7
             bx, by = self._find_safe_spawn(bx, by, TILE)
-            b = StalkerBoss(bx, by, self.current_level)
+            b = Ghost(bx, by, self.current_level)
             self.bosses.append(b)
 
         self.interactables   = []
@@ -1251,7 +1252,7 @@ class GameEngine:
             ]
             for cx, cy in corners:
                 sx, sy = self._find_safe_spawn(cx, cy, TILE)
-                self.interactables.append(SpecialItem(sx, sy))
+                self.interactables.append(Artifact(sx, sy))
                 # Đảm bảo có ít nhất 1 cây nến ở gần Artifact
                 csx, csy = self._find_safe_spawn(sx + TILE*2, sy, TILE)
                 self.interactables.append(Candle(csx, csy))
@@ -1390,26 +1391,15 @@ class GameEngine:
                                     buff = []
                                     if self.m5_items_placed==1:
                                         self.m5_hear=True
-                                        self.m5_smell=True
-                                        buff = ["Ghost can HEAR", "Ghost can SMELL"]
+                                        buff = ["Ghost can HEAR"]
                                     elif self.m5_items_placed==2:
                                         self.m5_see=True
                                         buff = ["Ghost can SEE"]
                                     elif self.m5_items_placed==3:
-                                        nb = StalkerBoss(self.bosses[0].rect.x,
-                                                        self.bosses[0].rect.y, 5)
-                                        nb.can_phase              = True
-                                        nb.can_hear               = self.m5_hear
-                                        nb.can_see                = self.m5_see
-                                        nb.can_see_through_walls  = self.m5_see
-                                        nb.can_smell              = self.m5_smell
-                                        self.bosses.append(nb)
-                                        buff = ["Ghost can DUPLICATE"]
+                                        self.m5_smell=True
+                                        buff = ["Ghost can SMELL"]
                                     elif self.m5_items_placed==4:
-                                        for b in self.bosses:
-                                            b.speed *= 0.75
-                                            b.current_speed = min(b.current_speed, b.speed)
-                                        buff = ["Ghost is SLOW", "TRAPPED! SURVIVE 30s!"]
+                                        buff = ["TRAPPED! SURVIVE 30s!"]
                                         
                                     self.buff_popup_text  = buff
                                     self.buff_popup_timer = 180 if self.m5_items_placed < 4 else 240
@@ -1501,7 +1491,7 @@ class GameEngine:
             for item in self.interactables:
                 if isinstance(item,Dot) and item.active and self.player.rect.colliderect(item.rect):
                     item.interact(self.player, self)
-                elif isinstance(item,SpecialItem) and item.active \
+                elif isinstance(item,Artifact) and item.active \
                         and self.player.rect.colliderect(item.rect):
                     item.interact(self.player, self)
                 elif isinstance(item,ButtonInteract) and item.active \
@@ -1648,7 +1638,7 @@ class GameEngine:
                     self.player.is_hidden = False
                     return
         for item in self.interactables:
-            if isinstance(item, SpecialItem) and item.active:
+            if isinstance(item, Artifact) and item.active:
                 d = math.hypot(px - item.rect.centerx, py - item.rect.centery)
                 if d <= 3 * TILE:
                     self.player.is_hidden = False
@@ -1684,7 +1674,7 @@ class GameEngine:
                 punch_candle_hole(self.fog, r.center[0], r.center[1], int(self.player.stats.vision_radius*TILE))
             elif isinstance(item,Note) and item.active:
                 punch_hole(self.fog, r.center[0], r.center[1], int(2.5*TILE))
-            elif isinstance(item,SpecialItem) and item.active:
+            elif isinstance(item,Artifact) and item.active:
                 punch_hole(self.fog, r.center[0], r.center[1], int(3*TILE))
                 
         pr = self.camera.apply(self.player)
@@ -1731,8 +1721,6 @@ class GameEngine:
                 if self.m5_hear:  skills.append("HEAR")
                 if self.m5_see:   skills.append("SEE")
                 if self.m5_smell: skills.append("SMELL")
-                if self.m5_items_placed >= 3: skills.append("DUPLICATE")
-                if self.m5_items_placed >= 4: skills.append("SLOW")
             elif self.current_level == 4:
                 skills = ["MOVE", "HEAR", "SEE", "SMELL", "DUPLICATE"]
             else:
@@ -1785,6 +1773,10 @@ class GameEngine:
 
     def run(self):
         while True:
+            if self.state == "MENU" and getattr(self, 'show_level_choices', False):
+                self.vol_rect.y = 580  # Đẩy thanh volume xuống dưới các nút level
+            else:
+                self.vol_rect.y = 520  # Trả về vị trí mặc định
             self.handle_events()
             sx = sy = 0
 
@@ -1810,12 +1802,8 @@ class GameEngine:
                 title = self.title_font.render("Pac-man The Labyrinth", True, RED)
                 self.screen.blit(title,(SCREEN_WIDTH//2-title.get_width()//2, 150))
                 
-                self.btn_classic.y = 510 if self.show_level_choices else 440
-                self.vol_rect.y = 590 if self.show_level_choices else 520
-
                 for btn,lbl in [(self.btn_labyrinth, "Labyrinth Mode"),
-                                (self.btn_choose,    "Choose Level"),
-                                (self.btn_classic,   "Classic Mode")]:
+                                (self.btn_choose,    "Choose Level")]:
                     pygame.draw.rect(self.screen, (40,35,30), btn)
                     pygame.draw.rect(self.screen, (80,70,60), btn, 1)
                     t = self.font.render(lbl, True, WHITE)
