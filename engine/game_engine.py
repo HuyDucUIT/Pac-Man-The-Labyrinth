@@ -258,7 +258,6 @@ class GameEngine(LevelManagerMixin, EventHandlerMixin, AudioMixin, RendererMixin
                         b.rect.topleft = (int(sx), int(sy))
                         b.state = "CHASE"
                         b.can_phase = True
-                        b.can_see_through_walls = True
                     self.shake_intensity  = 40
 
                 if self.m5_items_placed == 4:

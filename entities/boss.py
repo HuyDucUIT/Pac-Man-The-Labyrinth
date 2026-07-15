@@ -30,7 +30,6 @@ class Ghost(Entity):
         self.can_phase              = True
         self.can_hear               = level >= 2
         self.can_see                = level >= 3
-        self.can_see_through_walls  = level >= 3
         self.can_smell              = level >= 4
 
         self.smell_timer  = 0
@@ -46,13 +45,12 @@ class Ghost(Entity):
         """Ghi đè trực tiếp 3 giác quan (dùng riêng cho màn 5, khi người chơi lần lượt mở khoá kỹ năng Boss qua từng Artifact)."""
         self.can_hear              = hear
         self.can_see               = see
-        self.can_see_through_walls = see
         self.can_smell             = smell
 
     def update(self, player, walls, map_w, map_h, gs):
         """Hàm cập nhật chính mỗi khung hình: kiểm tra điều kiện chuyển trạng thái FSM (thấy/nghe/ngửi thấy người chơi), sau đó gọi _move_to() để di chuyển theo trạng thái hiện tại và giới hạn Boss trong biên bản đồ."""
         if self.state == "CHASE":
-            if player.is_hidden or not self.check_los(player, walls):
+            if player.is_hidden:
                 self.state = "INVESTIGATE"
             else:
                 self.target_pos = player.rect.center
@@ -61,7 +59,7 @@ class Ghost(Entity):
             if self.can_see and not player.is_hidden:
                 d = math.hypot(player.rect.centerx-self.rect.centerx,
                                player.rect.centery-self.rect.centery)
-                if d <= 8*TILE and self.check_los(player, walls):
+                if d <= 8*TILE:
                     self.state = "CHASE"
                     self.target_pos = player.rect.center
 
@@ -91,7 +89,7 @@ class Ghost(Entity):
                 self.state = "ROAM"; self.target_pos = None
 
         elif self.state == "CHASE":
-            if self.can_see_through_walls:
+            if self.can_see:
                 self.target_pos = player.rect.center
 
         if self.target_pos:
@@ -101,21 +99,6 @@ class Ghost(Entity):
         self.y = max(TILE * 3.0, min(float(map_h - TILE * 4.0), self.y))
         self.rect.x = int(self.x)
         self.rect.y = int(self.y)
-
-    def check_los(self, player, walls):
-        """Kiểm tra đường ngắm (line-of-sight) tới người chơi bằng cách dò từng điểm trên đoạn thẳng nối hai tâm, trả về False nếu bị tường chắn. Nếu Boss đã có khả năng nhìn xuyên tường thì luôn trả về True."""
-        if self.can_see_through_walls:
-            return True
-        s, e = self.rect.center, player.rect.center
-        d = math.hypot(e[0]-s[0], e[1]-s[1])
-        if d == 0: return True
-        for i in range(1, int(d/8)):
-            t = i/(int(d/8))
-            p = pygame.Rect(int(s[0]+(e[0]-s[0])*t)-2,
-                            int(s[1]+(e[1]-s[1])*t)-2, 4, 4)
-            for w in walls:
-                if p.colliderect(w): return False
-        return True
 
     def hear_noise(self, x, y, radius, noise_mod):
         """Được AudioMixin gọi khi có tiếng động phát ra; nếu Boss có thể nghe và không đang CHASE, chuyển sang INVESTIGATE và ghi nhớ vị trí phát ra tiếng động."""
